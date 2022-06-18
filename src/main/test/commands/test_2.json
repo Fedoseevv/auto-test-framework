@@ -1,0 +1,22 @@
+[
+  {
+    "type": "counts",
+    "source_path": "src/main/test/count_failed/count_failed_1.SQL",
+    "target_path": "src/main/test/count_failed/count_failed_2.SQL"
+  },
+  {
+    "type": "dataframes",
+    "source_path": "src/main/test/df_failed/df_failed_1.SQL",
+    "target_path": "src/main/test/df_failed/df_failed_2.SQL"
+  },
+  {
+    "type": "schema",
+    "source_path": "src/main/test/schema_failed/schema_failed.SQL",
+    "target_showcase": "operation"
+  },
+  {
+    "type": "constants",
+    "source_path": "src/main/test/constants_failed/constants_failed_1.SQL",
+    "constants_path": "src/main/test/constants_failed/constants_failed_1.txt"
+  }
+]

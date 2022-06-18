@@ -1,0 +1,1 @@
+`ClientId` INT,`ClientName` STRING,`Type` STRING,`Form` STRING,`RegisterDate` DATE

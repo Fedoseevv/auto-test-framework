@@ -1,0 +1,2 @@
+SELECT COUNT(1)
+    FROM (SELECT * FROM client LIMIT 20) subq
