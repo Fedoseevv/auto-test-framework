@@ -1,0 +1,4 @@
+name;type;comment
+bank_id;int;Код платежной системы
+bank_nm;string;Название платежной системы
+bank_ch_percent;decimal(20,2);Комиссия в процентах
