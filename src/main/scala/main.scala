@@ -1,10 +1,12 @@
-import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import com.testClass.AutoTest
 import org.apache.spark.sql.types.{DateType, FloatType, IntegerType, StringType, StructField, StructType}
 
 object main {
   def main(args: Array[String]): Unit = {
     System.setProperty("hadoop.home.dir", "D:\\opt\\spark-2.4.7-bin-hadoop2.7")
+    import org.apache.log4j.PropertyConfigurator
+    PropertyConfigurator.configure("D:\\opt\\spark-2.4.7-bin-hadoop2.7\\conf\\log4j.properties")
 
     val spark = SparkSession
       .builder()
@@ -69,7 +71,8 @@ object main {
     mask.createOrReplaceTempView("calculation_params_tech")
 
     val testSettingPath = "src/main/test/commands/test_1.json"
-//    Tester.startTesting(spark, testSettingPath)
+
+
     val tester = AutoTest(spark, testSettingPath)
     tester.isEqualCounts("src/main/test/test_1_source_counts.sql",
       "src/main/test/test_1_source_counts.sql")
@@ -77,6 +80,8 @@ object main {
       "src/main/test/test_1_target_arrays.sql")
     tester.isEqualSchemas("src/main/test/test_1_source_ddl.sql",
                                   "src/main/test/test_1_target_ddl.sql")
+    tester.isEqualConstants("src/main/test/test_1_source_constants.sql",
+                          "src/main/test/test_1_target_constants.txt")
     tester.parseResult()
   }
 }
