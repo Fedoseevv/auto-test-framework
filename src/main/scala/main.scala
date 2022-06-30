@@ -42,7 +42,7 @@ object main {
       .add("middle_nm", StringType)
       .add("birth_dt", StringType)
 
-    val path = "src/main/test"
+    val path = "src/main/resources"
 
     val accounts: DataFrame = spark.read.schema(AccountSchema)
       .option("header", value = true).option("delimiter", ",")
