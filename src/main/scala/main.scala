@@ -1,6 +1,6 @@
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import com.testClass.AutoTest
-import org.apache.spark.sql.types.{DateType, FloatType, IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructType}
 
 object main {
   def main(args: Array[String]): Unit = {
@@ -11,77 +11,95 @@ object main {
     val spark = SparkSession
       .builder()
       .master("local[*]")
-      .appName("Demo-test project")
+      .appName("Auto-test framework")
+//      .enableHiveSupport()
       .getOrCreate()
     spark.sparkContext.setLogLevel("ERROR")
 
-    val RateSchema = new StructType(Array(
-      StructField("Currency", StringType),
-      StructField("Rate", FloatType),
-      StructField("RateDate", DateType)
-    ))
-
     val AccountSchema = new StructType()
-      .add("AccountID", IntegerType)
-      .add("AccountNum", StringType)
-      .add("ClientId", IntegerType)
-      .add("DateOpen", DateType)
+      .add("account_num", IntegerType)
+      .add("account_balance", LongType)
+      .add("open_dt", StringType)
+      .add("id", IntegerType)
+      .add("client_type", StringType)
+
+    val CompaniesSchema = new StructType()
+      .add("company_id", IntegerType)
+      .add("company_name", StringType)
+      .add("birth_dt", StringType)
 
     val OperationSchema = new StructType()
-      .add("AccountDB", IntegerType, nullable = false)
-      .add("AccountCR", IntegerType, nullable = false)
-      .add("DateOp", DateType, nullable = false)
-      .add("Amount", FloatType, nullable = false)
-      .add("Currency", StringType, nullable = false)
-      .add("Comment", StringType, nullable = true)
+      .add("operation_id", IntegerType)
+      .add("account_num", IntegerType)
+      .add("account_num_recipient", IntegerType)
+      .add("operation_sum", LongType)
+      .add("operation_date", StringType)
 
-    val ClientSchema = new StructType(Array(
-      StructField("ClientId", IntegerType),
-      StructField("ClientName", StringType),
-      StructField("Type", StringType),
-      StructField("Form", StringType),
-      StructField("RegisterDate", DateType)
-    ))
+    val UsersSchema = new StructType()
+      .add("user_id", IntegerType)
+      .add("last_nm", StringType)
+      .add("first_nm", StringType)
+      .add("middle_nm", StringType)
+      .add("birth_dt", StringType)
 
-    val path = "src/main/resources/tmp"
+    val path = "src/main/test"
 
-    val rate: DataFrame = spark.read.schema(RateSchema)
-      .option("header", value = true).option("delimiter", ";")
-      .csv(path + "/tmp_rate.csv")
+    val accounts: DataFrame = spark.read.schema(AccountSchema)
+      .option("header", value = true).option("delimiter", ",")
+      .csv(path + "/Bank.Accounts_sample.csv")
+    accounts.createOrReplaceTempView("Accounts")
 
-    val operation: DataFrame = spark.read.schema(OperationSchema)
-      .option("header", value = true).option("delimiter", ";")
-      .csv(path + "/tmp_operation.csv")
+    val companies: DataFrame = spark.read.schema(CompaniesSchema)
+      .option("header", value = true).option("delimiter", ",")
+      .csv(path + "/Bank.Companies_sample.csv")
+    companies.createOrReplaceTempView("Companies")
 
-    val account: DataFrame = spark.read.schema(AccountSchema)
-      .option("header", value = true).option("delimiter", ";")
-      .csv(path + "/tmp_account.csv")
+    val operations: DataFrame = spark.read.schema(OperationSchema)
+      .option("header", value = true).option("delimiter", ",")
+      .csv(path + "/Bank.Operations_sample.csv")
+    operations.createOrReplaceTempView("Operations")
 
-    val client: DataFrame = spark.read.schema(ClientSchema)
-      .option("header", value = true).option("delimiter", ";")
-      .csv(path + "/tmp_client.csv")
+    val users: DataFrame = spark.read.schema(UsersSchema)
+      .option("header", value = true).option("delimiter", ",")
+      .csv(path + "/Bank.Users_sample.csv")
+    users.createOrReplaceTempView("Users")
 
-    val mask: DataFrame = spark.read.option("inferSchema", value = true).option("header", value = true).option("delimiter", ";")
-      .csv(path + "/calculation_params_tech.csv")
+    spark.sql(
+      """
+        |select
+        |           t.id,
+        |	   t.account_num,
+        |	   sum(t.income) as income,
+        |	   sum(t.outcome) as outcome,
+        |	   t.client_type
+        |from
+        |(
+        |select
+        |           acc.id,
+        |	   acc.account_num,
+        |	   SUM(oper.operation_sum) as income,
+        |	   0 as outcome,
+        |	   acc.client_type
+        |from
+        |           Accounts acc
+        |left join Operations oper on
+        |           acc.account_num = oper.account_num_recipient
+        |group by acc.id, acc.account_num, acc.client_type
+        |union
+        |select
+        |           acc.id,
+        |	   acc.account_num,
+        |	   0 as income,
+        |	   SUM(oper.operation_sum) as outcome,
+        |	   acc.client_type
+        |from
+        |           Accounts acc
+        |left join Operations oper on
+        |           acc.account_num = oper.account_num
+        |group by acc.id, acc.account_num, acc.client_type) as t
+        |group by t.id, t.account_num, t.client_type
+        |""".stripMargin).createOrReplaceTempView("dm_sum_operations")
 
-    client.createOrReplaceTempView("client")
-    account.createOrReplaceTempView("account")
-    operation.createOrReplaceTempView("operation")
-    rate.createOrReplaceTempView("rate")
-    mask.createOrReplaceTempView("calculation_params_tech")
-
-    val testSettingPath = "src/main/test/commands/test_1.json"
-
-
-    val tester = AutoTest(spark, testSettingPath)
-    tester.isEqualCounts("src/main/test/test_1_source_counts.sql",
-      "src/main/test/test_1_source_counts.sql")
-    tester.isEqualDF("src/main/test/test_1_source_arrays.sql",
-      "src/main/test/test_1_target_arrays.sql")
-    tester.isEqualSchemas("src/main/test/test_1_source_ddl.sql",
-                                  "src/main/test/test_1_target_ddl.sql")
-    tester.isEqualConstants("src/main/test/test_1_source_constants.sql",
-                          "src/main/test/test_1_target_constants.txt")
-    tester.parseResult()
+    AutoTest(spark).start(path)
   }
 }

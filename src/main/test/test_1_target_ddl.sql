@@ -1,1 +1,1 @@
-DESCRIBE operation
+describe dm_sum_operations

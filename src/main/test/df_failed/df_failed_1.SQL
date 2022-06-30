@@ -1,1 +1,0 @@
-SELECT * FROM client limit 10

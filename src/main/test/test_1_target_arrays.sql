@@ -1,2 +1,1 @@
-SELECT *
-    FROM client
+select * from dm_sum_operations

@@ -1,0 +1,1 @@
+select * from Dm.dm_sum_operations

@@ -10,6 +10,6 @@ case class CustomLogger() {
   }
   def error(msg: String): Unit = {
     val logDT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss,ms").format(LocalDateTime.now)
-    println(Console.RED + logDT + " INFO: " + msg)
+    println(Console.RED + logDT + " ERROR: " + msg)
   }
 }

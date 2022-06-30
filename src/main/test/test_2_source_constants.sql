@@ -1,0 +1,1 @@
+select count(1) from dm_sum_operations dm_sum where dm_sum.client_type = 'Л'

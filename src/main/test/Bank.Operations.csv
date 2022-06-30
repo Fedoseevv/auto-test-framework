@@ -1,0 +1,6 @@
+name,type,comment
+operation_id,int,id перевода
+account_num,int,номер счета отправителя
+account_num_recipient,int,номер счета получателя
+operation_sum,bigint,сумма перевода
+operation_date,string,дата перевода

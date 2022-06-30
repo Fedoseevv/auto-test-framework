@@ -1,3 +1,1 @@
-SELECT *
-    FROM client
-    LIMIT 10
+select dm_sum.id, dm_sum.account_num from dm_sum_operations dm_sum where dm_sum.client_type = 'Ф'

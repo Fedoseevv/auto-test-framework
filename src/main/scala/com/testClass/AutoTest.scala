@@ -6,6 +6,7 @@ import scala.collection.mutable
 import scala.io.Source
 import com.helpfulClasses.CustomLogger
 
+import java.io.File
 import scala.util.matching.Regex
 
 /**
@@ -17,40 +18,63 @@ import scala.util.matching.Regex
  * 4) isEqualConstants - compares the query result with the expected data. The input is the path to the sql
  *    query and a text file containing the expected result
  */
-case class AutoTest(private val spark: SparkSession, private val settingPath: String) {
+case class AutoTest(private val spark: SparkSession) {
   private val results = mutable.Map.empty[String, Any] // Содержит результаты пройденных тестов (название -> результат)
   val logger = new CustomLogger // Логгер для логгирования результатов
+
+  private def getTestName(name: String): String = name.split("\\\\").last
+                                          .replaceAll(new Regex("(source_|target_)").regex, "")
+                                          .replaceAll(new Regex("\\.\\w+").regex, "")
 
   // Метод, используемый для записи в results данных о пройденных тестах
   private def logTest(name: String, res: Boolean): Any = {
     // Из пути к файлу достаем название и номер теста
-    val testName = name.split("/").last
-      .replaceAll(new Regex("(source_|target_)").regex, "")
-      .replaceAll(new Regex("\\.\\w+").regex, "")
-    results += (testName -> res) // Сохраяем результат очередного теста
+    results += (getTestName(name) -> res) // Сохраяем результат очередного теста
+  }
+
+  // Метод, запускающий все тесты
+  def start(path: String): Unit = {
+    val filesHere = new File(path).listFiles()
+    for (file <- filesHere; name = file.getName if name.matches(new Regex("test_\\d+_source_\\w+.sql").regex)) {
+      if (name.contains("arrays")) {
+        this.isEqualDF(file.getPath, file.getPath.replace("source", "target"))
+      } else if (name.contains("counts")) {
+        this.isEqualCounts(file.getPath, file.getPath.replace("source", "target"))
+      } else if (name.contains("ddl")) {
+        this.isEqualSchemas(file.getPath, file.getPath.replace("source", "target"))
+      } else {
+        this.isEqualConstants(file.getPath, file.getPath.replace("source", "target"))
+      }
+    }
+
+    this.parseResult()
   }
 
   // Метод, используемый для вывода вывода результата и "выброса" исключение, если какой-либо тест не прошел
   def parseResult(): Unit = {
     var flag = false // false - ошибок нет, true - ошибка есть
+    val failedTests: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty
     logger.info("----- All tests result -----")
     for (item <- results) {
       if (item._2 == true) // Если результат теста положительный
         logger.info(s"${item._1} - *** result: 'SUCCESS' ***")
       else
         logger.error(s"${item._1} - *** result: 'FAILED' ***")
-      if (item._2 == false) // Если результат теста отрицательный, изменяем флаг
+
+      if (item._2 == false) { // Если результат теста отрицательный, изменяем флаг
         flag = true
+        failedTests.append(item._1)
+      }
     }
-    if (flag) // В случае обнаружение FAILED-теста "выбрасываем" исключение
-      throw new Exception("Not all tests were successful! *** FAILED ***")
+    if (flag)  // В случае обнаружение FAILED-теста "выбрасываем" исключение
+      throw new Exception(s"Failed tests: ${failedTests.mkString(", ")} - *** FAILED ***")
     else
       println("All tests were successful! *** COMPLETED ***")
   }
 
-  // Метод, реализующий тестирование количества строк, на вход получает пути до двух sql-запросов (source и target)
+  // Метод, реализующий сравнение количества строк, на вход получает пути до двух sql-запросов (source и target)
   def isEqualCounts(countSourcePath: String, countTargetPath: String): Boolean = {
-    logger.info("isEqualCounts started...")
+    logger.info(s"${getTestName(countSourcePath)} started...")
     var file = Source.fromFile(countSourcePath)
     val sourceCount = spark.sql(file.mkString).collect()(0) // Получаем результат первого запроса
       .toString().replace("[", "").replace("]", "").toInt // и приводим его к INT
@@ -71,15 +95,15 @@ case class AutoTest(private val spark: SparkSession, private val settingPath: St
 
   // Метод, реализующий полное сравнение двух датафреймов, на вход получает пути до двух sql-запросов (source и target)
   def isEqualDF(sourceSQLPath: String, targetSQLPath: String): Boolean = {
-    logger.info("isEqualDF started...")
+    logger.info(s"${getTestName(sourceSQLPath)} started...")
     var file = Source.fromFile(sourceSQLPath)
     val sourceResult: DataFrame = spark.sql(file.mkString) // Получаем первый датафрейм
 
     file = Source.fromFile(targetSQLPath)
     val targetResult: DataFrame = spark.sql(file.mkString) // Получаем второй датафрейм
     file.close()
-    val rowCountSource = sourceResult.count() // Количество строк первого DF
-    val rowCountTarget = targetResult.count() // Количество строк второго DF
+    val rowCountSource = sourceResult.count() // Количество строк source DF
+    val rowCountTarget = targetResult.count() // Количество строк target DF
     val rowCountDiff: Long = Math.abs(rowCountSource - rowCountTarget) // Разница в количестве строк между DF
     try {
       if (rowCountDiff == 0) { // Если количество строк совпадает, то выполняем except и проверяем пустой результат или нет
@@ -90,7 +114,7 @@ case class AutoTest(private val spark: SparkSession, private val settingPath: St
           logTest(sourceSQLPath, res = true)
           true // Выходим из метода
         }
-      } else { // Если количество строк различает, except можно уже не делать, логгируем FAILED
+      } else { // Если количество строк различается, except можно уже не делать, логгируем FAILED
         logTest(sourceSQLPath, res = false)
         false // Выходим из метода
       }
@@ -104,11 +128,13 @@ case class AutoTest(private val spark: SparkSession, private val settingPath: St
 
   // Метод, реализующий сравнение двух DDL, на вход получает пути до двух DDL (source и target)
   def isEqualSchemas(sourceDDLPath: String, targetDDLPath: String): Boolean = {
-    logger.info("isEqualSchemas started...")
-    var file = Source.fromFile(sourceDDLPath)
-    val sourceDDL = spark.sql(file.mkString)
-    file = Source.fromFile(targetDDLPath)
-    val targetDDL = spark.sql(file.mkString)
+    logger.info(s"${getTestName(sourceDDLPath)} started...")
+    val sourceDDL: DataFrame = spark.read.option("inferSchema", value = true)
+      .option("header", value = false).option("delimiter", ",")
+      .csv(sourceDDLPath).toDF("col_name", "data_type", "comment").drop("comment")
+
+    val file = Source.fromFile(targetDDLPath)
+    val targetDDL = spark.sql(file.mkString).drop("comment")
     file.close()
 
     try {
@@ -128,34 +154,30 @@ case class AutoTest(private val spark: SparkSession, private val settingPath: St
     }
   }
 
-  // Метод, реализующий сравнение двух результата sql-запроса и содержимого файла,
-  // на вход получает пути до sql-запроса и текстового файла
-  def isEqualConstants(sourcePath: String, targetResPath: String): Boolean = {
-    logger.info("isEqualConstants started...")
-    // [1,Клиент 1,Ф,-,2020-11-01] - строка, приведенная к элементу массива
-    var file = Source.fromFile(sourcePath)
-    val sourceResult = spark.sql(file.mkString) // Результат sql-запроса
-
-    file = Source.fromFile(targetResPath)
-    val targetRes = file.getLines().toArray // Содержимое текстового файла записываем в массив
+  // Метод, реализующий сравнение результата sql-запроса с заданным csv-файлом
+  def isEqualConstants(sourcePath: String, targetPath: String): Boolean = {
+    logger.info(s"${getTestName(sourcePath)} started...")
+    val file = Source.fromFile(sourcePath)
+    val sourceDf = spark.sql(file.toList.mkString) // Результат sql-запроса
     file.close()
 
-    targetRes.map(str => str.trim())
-    val source = sourceResult.collect() // Сохраняем результат sql-запроса в массив
+    val targetDf = spark.read.option("header", value = false).option("delimiter", ",") // Заданный csv-файл
+      .csv(targetPath).toDF(sourceDf.columns: _*)
 
-    if (source.length == targetRes.length) { // Если количество строк совпадает, то начинаем сравнивать построчно
-      for (row <- source) {
-        if (targetRes.indexOf(row.toString()) == -1) { // Если какой-либо строки нет, то логгируем FAILED и выходим
+    try {
+        if (sourceDf.count() == targetDf.count() && sourceDf.except(targetDf).isEmpty) {
+          logTest(sourcePath, res = true)
+          true
+        } else {
           logTest(sourcePath, res = false)
-          return false
+          false
         }
+      } catch {
+      case _: Throwable => {
+        logTest(sourcePath, res = false)
+        false
       }
-    } else { // Если количество строк не совпадает, то логгируем FAILED и выходим
-      logTest(sourcePath, res = false)
-      return false
     }
-    logTest(sourcePath, res = true) // Если в процессе сравнение все строки были найдены, то логгируем SUCCESS
-    true
-  }
 
+  }
 }
