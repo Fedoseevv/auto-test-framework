@@ -1,4 +1,0 @@
-name,type,comment
-company_id,int,id компании
-company_name,string,название компании
-birth_dt,string,дата создания компании
