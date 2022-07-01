@@ -1,1 +1,0 @@
-describe Dm.dm_sum_operations

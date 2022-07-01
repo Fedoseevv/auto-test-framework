@@ -1,1 +1,0 @@
-select dm_sum.id, dm_sum.account_num from Dm.dm_sum_operations dm_sum where dm_sum.client_type = 'Ô'

@@ -1,6 +1,0 @@
-name,type,comment
-account_num,int,номер счета
-account_balance,bigint,баланс счета
-open_dt,string,дата открытия счета
-id,int,id клиента или компании
-client_type,string,'Ф' - физическое или 'Ю' - юридическое лицо

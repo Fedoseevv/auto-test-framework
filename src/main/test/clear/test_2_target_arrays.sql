@@ -1,1 +1,0 @@
-select dm_sum.id, dm_sum.account_num, dm_sum.income, dm_sum.outcome from Dm.dm_sum_operations dm_sum

@@ -1,6 +1,0 @@
-name,type,comment
-user_id,int,id клиента
-last_nm,string,фамилия клиента
-first_nm,string,имя клиента
-middle_nm,string,отчество клиента
-birth_dt,string,дата рождения клиента

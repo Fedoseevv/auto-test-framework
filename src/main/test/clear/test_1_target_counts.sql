@@ -1,1 +1,0 @@
-select count(1) from Dm.dm_sum_operations 
