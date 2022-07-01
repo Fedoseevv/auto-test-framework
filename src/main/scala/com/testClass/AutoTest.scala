@@ -55,14 +55,15 @@ case class AutoTest(private val spark: SparkSession) {
   }
   // Метод, для запуска тестирования в контуре
   def startTestingOnCluster(): Unit = {
+    // Ниже создаем файловую систему из файла JAR(zip), а затем обходим каталоги и ищем по маске файлы тестов
     val src = getClass.getProtectionDomain.getCodeSource
-    val jar = src.getLocation
-    val zip = new ZipInputStream(jar.openStream())
-    val reg = new Regex("test_\\d+_source_\\w+.sql").regex
+    val jar = src.getLocation // Получаем путь до файла jar
+    val zip = new ZipInputStream(jar.openStream()) // создаем файловую систему из файла JAR(zip)
+    val reg = new Regex("test_\\d+_source_\\w+.sql").regex // Регулярка для поиска файлов тестов
 
-    while (true) {
+    while (true) { // Обход каталогов
       val entry = zip.getNextEntry
-      if (entry == null) {
+      if (entry == null) { // Когда файлы в каталоге закончились, печатаем результатов тестов и выходим из метода
         this.parseResult()
         return
       }
