@@ -13,8 +13,8 @@ import scala.util.matching.Regex
 case class DdlRecord(col_name: String, data_type: String, comment: String)
 
 /**
- * Данный класс реализует функционал для 4 различных кейсов тестирований
- * 1) isEqualCounts - Сравнивает результаты двух sql-запросов, направленных на подсчет строк в таблице,
+ * Данный класс реализует функционал для 4 различных кейсов тестирования
+ * 1) isEqualCounts - Сравнивает результаты двух sql-запросов, направленных на подсчет строк в таблице
  * 2) isEqualDF - Сравнивает результаты двух sql-запросов, формирующих датафреймы
  * 3) isEqualSchemas - Сравнивает атрибут describe заданной таблицы с входным DDL
  * 4) isEqualConstants - Сравнивает результат sql-запроса с входными данными, содержащими ожидаемый результат
@@ -32,12 +32,12 @@ case class AutoTest(private val spark: SparkSession) {
 
   // Метод, используемый для записи в results данных о пройденных тестах
   private def logTest(name: String, res: Any): Any = {
-    // Из пути к файлу достаем название и номер теста
+    // Из пути к файлу "достаем" название и номер теста
     results += (getTestName(name) -> res) // Сохраяем результат очередного теста
   }
 
   // Метод, запускающий все тесты в локальном режиме (необходимо передать путь src/main/resources)
-  def start(path: String): Unit = {
+  def start(path: String = "src/main/resources"): Unit = {
     val filesHere = new File(path).listFiles() // Получаем все файлы в заданном каталоге
     // В зависимости от названия теста, запускаем определенный метод данного класса
     for (file <- filesHere; name = file.getName if name.matches(new Regex("test_\\d+_source_\\w+.sql").regex)) {
@@ -47,8 +47,10 @@ case class AutoTest(private val spark: SparkSession) {
         this.isEqualCounts(s"/${name}", s"/${name.replace("source", "target")}")
       } else if (name.contains("ddl")) {
         this.isEqualSchemas(s"/${name}", s"/${name.replace("source", "target")}")
-      } else {
+      } else if (name.contains("constants")) {
         this.isEqualConstants(s"/${name}", s"/${name.replace("source", "target")}")
+      } else {
+
       }
     }
     this.parseResult() // После запуска всех тестов печатаем их результаты
@@ -63,36 +65,38 @@ case class AutoTest(private val spark: SparkSession) {
 
     while (true) { // Обход каталогов
       val entry = zip.getNextEntry
-      if (entry == null) { // Когда файлы в каталоге закончились, печатаем результатов тестов и выходим из метода
+      if (entry == null) { // Когда файлы в каталоге закончились, печатаем результаты тестов и выходим из метода
         this.parseResult()
         return
       }
 
-      val name = entry.getName
-      if (name.matches(reg)) {
+      val name = entry.getName // Получаем название очередного файла
+      if (name.matches(reg)) { // Если это файл теста, то есть он удовлетворяет регулярному выражению
         if (name.contains("arrays")) {
           this.isEqualDF(s"/$name", s"/${name.replace("source", "target")}")
         } else if (name.contains("counts")) {
           this.isEqualCounts(s"/$name", s"/${name.replace("source", "target")}")
         } else if (name.contains("ddl")) {
           this.isEqualSchemas(s"/$name", s"/${name.replace("source", "target")}")
-        } else {
+        } else if (name.contains("constants")) {
           this.isEqualConstants(s"/$name", s"/${name.replace("source", "target")}")
+        } else {
+          this.isEqualDataframes(s"/$name", s"/${name.replace("source", "target")}")
         }
       }
     }
   }
 
-  // Метод, используемый для вывода вывода результата и "выброса" исключение, если какой-либо тест(-ы) не прошел
+  // Метод, используемый для вывода результата тестирования и "выброса" исключение, если какой-либо тест(-ы) не прошел
   def parseResult(): Unit = {
     var flag = false // false - ошибок нет, true - ошибка есть
     val failedTests: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty // Массив для сборы FAILED-тестов
     logger.info("----- All tests result -----")
-    results.foreach{ item => { // Идем по всем результатом и сопоставляем с образцом
+    results.foreach{ item => { // Идем по всем результатам и сопоставляем с образцом
       item match {
         case p if p._2.isInstanceOf[String] => // Если в поле _2 хранится строка, значит тест FAILED
           println(s"${item._1} *** 'FAILED' *** - Reason: ${item._2}")
-          flag = true
+          flag = true // потому что найден FAILED-тест
           failedTests.append(item._1) // Добавляем название FAILED-теста
         case _ => println(s"${item._1} *** 'SUCCESS' ***") // В ином случае тест пройден успешно
       }
@@ -131,7 +135,7 @@ case class AutoTest(private val spark: SparkSession) {
         .replace("[", "").replace("]", "").toInt // и приводим его к INT
       stream.close()
 
-      if (sourceCount != targetCount) { // Если результаты НЕ совпали, то логгируем с FAILED-тест с причиной
+      if (sourceCount != targetCount) { // Если результаты НЕ совпали, то логгируем FAILED-тест, указывая причину
         logTest(countSourcePath, s"!!! source-count: $sourceCount doesn't match target-count: $targetCount !!!")
         false // Выходим из метода
       } else { // Если результаты совпали, то логгируем с true
@@ -179,11 +183,11 @@ case class AutoTest(private val spark: SparkSession) {
         logTest(sourceSQLPath, s"!!! source-count: $rowCountSource doesn't match target-count $rowCountTarget !!!")
         false // Выходим из метода
       }
-    } catch { // Сюда попадем, если схемы df не совпадают => результаты они вернули тоже разные => логгируем FAILED
-      case ex: FileNotFoundException =>
+    } catch {
+      case ex: FileNotFoundException => // Если какой-либо файл не удалось найти в папке ресурсов
         logTest(sourceSQLPath, "!!! Invalid file path !!!")
         false
-      case _: Throwable => // Если схема датафреймов не совпадает, то except выбросит исключение
+      case _: Throwable => // Если схемы df не совпадают => результаты они вернули тоже разные => логгируем FAILED
         logTest(sourceSQLPath, "!!! the schema of the result doesn't match the schema of the expected !!!")
         false
     }
@@ -199,7 +203,7 @@ case class AutoTest(private val spark: SparkSession) {
       case Array(name, data_type, comment) => DdlRecord(name, data_type, comment)
     }
 
-    spark.createDataFrame(records)
+    spark.createDataFrame(records) // Возвращаем датафрейм, содержащий DDL таблицы
   }
 
   // Метод, реализующий сравнение двух DDL, на вход sql-запрос (describe Table) и .sql-файл, содержащий DDL-таблицы в формате csv
@@ -227,7 +231,7 @@ case class AutoTest(private val spark: SparkSession) {
       case ex: FileNotFoundException =>
         logTest(sourceDDLPath, "!!! Invalid file path !!!")
         false
-      case _: Throwable => {
+      case _: Throwable => { // Если схемы df не совпадают => результаты они вернули тоже разные => логгируем FAILED
         logTest(sourceDDLPath, "!!! source DDL doesn't match with target DDL !!!")
         false
       }
@@ -272,6 +276,39 @@ case class AutoTest(private val spark: SparkSession) {
       case _: Throwable =>
         logTest(sourcePath, "!!! Unexpected error. Check input files and try again !!!")
         false
+    }
+  }
+
+  def isEqualDataframes(sourcePath: String, targetPath: String): Boolean = {
+    logger.info(s"${getTestName(sourcePath)} started...")
+    try {
+      // Считываем первый sql-запрос
+      var stream = getClass.getResourceAsStream(sourcePath)
+      val sourceQuery = Source.fromInputStream(stream).mkString
+      val sourceResult: DataFrame = spark.sql(sourceQuery) // Получаем первый датафрейм
+
+      // Считываем второй sql-запрос
+      stream = getClass.getResourceAsStream(targetPath)
+      val targetQuery = Source.fromInputStream(stream).mkString
+      val targetResult: DataFrame = spark.sql(targetQuery) // Получаем второй датафрейм
+      stream.close()
+
+      // Если количество строк в датафреймах одинаковое и except выдает пустой df, тогда они эквивалентны
+      if (sourceResult.count() == targetResult.count() && sourceResult.except(targetResult).count() == 0) {
+        logTest(sourcePath, res = true)
+        true // Выходим из метода
+      } else {
+        logTest(sourcePath, "!!! Source dataframe doesn't equal target dataframe !!!")
+        false // Выходим из метода
+      }
+    } catch {
+      case ex: FileNotFoundException => // Если какой-либо файл не удалось найти в папке ресурсов
+        logTest(sourcePath, "!!! Invalid file path !!!")
+        false
+      case _: Throwable => // Если схемы df не совпадают => результаты они вернули тоже разные => логгируем FAILED
+        logTest(sourcePath, "!!! the schema of the result doesn't match the schema of the expected !!!")
+        false
+
     }
   }
 }
