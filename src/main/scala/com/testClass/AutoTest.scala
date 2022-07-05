@@ -10,7 +10,7 @@ import java.io.{File, FileNotFoundException}
 import java.util.zip.ZipInputStream
 import scala.util.matching.Regex
 // Кейс-класс, содержащий описание структуры DDL. Используется в тестах isEqualSchema
-case class DdlRecord(col_name: String, data_type: String, comment: String)
+case class DdlRecord(col_name: String, data_type: String)
 
 /**
  * Данный класс реализует функционал для 4 различных кейсов тестирования
@@ -50,7 +50,7 @@ case class AutoTest(private val spark: SparkSession) {
       } else if (name.contains("constants")) {
         this.isEqualConstants(s"/${name}", s"/${name.replace("source", "target")}")
       } else {
-
+        this.isEqualDataframes(s"/$name", s"/${name.replace("source", "target")}")
       }
     }
     this.parseResult() // После запуска всех тестов печатаем их результаты
@@ -194,13 +194,13 @@ case class AutoTest(private val spark: SparkSession) {
   }
 
   // Метод для чтения DDL таблицы в формате csv из файла в папке resources
-  private def readDdlFromResource(path: String, del: String = ","): DataFrame = {
+  private def readDdlFromResource(path: String, del: String = ";"): DataFrame = {
     val stream = getClass.getResourceAsStream(path)
     val file = Source.fromInputStream(stream).getLines().toSeq // Считываем все строки
 
     val rdd = spark.sparkContext.parallelize(file) // Создаем RDD
     val records = rdd.map(x => x.split(del)).map { // Преобразуем все строки к экземплярам кейс-класса DdlRecord
-      case Array(name, data_type, comment) => DdlRecord(name, data_type, comment)
+      case Array(name, data_type) => DdlRecord(name, data_type)
     }
 
     spark.createDataFrame(records) // Возвращаем датафрейм, содержащий DDL таблицы
@@ -211,7 +211,7 @@ case class AutoTest(private val spark: SparkSession) {
     logger.info(s"${getTestName(sourceDDLPath)} started...")
     try {
       // Считываем датафрейм и удаляем столбец с комментариями
-      val sourceDDL: DataFrame = readDdlFromResource(sourceDDLPath).drop("comment")
+      val sourceDDL: DataFrame = readDdlFromResource(sourceDDLPath) //.drop("comment")
 
       // Считываем датафрейм и удаляем столбец с комментариями
       val stream = getClass.getResourceAsStream(targetDDLPath)
@@ -251,18 +251,24 @@ case class AutoTest(private val spark: SparkSession) {
       stream = getClass.getResourceAsStream(targetPath)
       var target = Source.fromInputStream(stream).getLines().toArray
       stream.close()
-
-      target = target.map(str => str.trim) // Удаляем лишние пробелы, символы конца строк
+      // Заменяем ";" на ",", так как строки содержат разделитель ","
+      target = target.map(str => str.trim.replaceAll(";", ",")) // Удаляем лишние пробелы, символы конца строк
       val source = sourceDf.collect().map(str => str.toString() // Преобразуем результат запроса source в массив строк
         .replace("[", "").replace("]", ""))
 
       if (source.length == target.length) { // Если количество строк совпадает, то начинаем сравнивать массивы
-        for (row <- source) { // Проходим по строкам полученного результата и ищем их в target
-          if (target.indexOf(row) == -1) { // Если какой-либо строки нет, то логгируем результат FAILED, указав строку, которой нет
-            logTest(sourcePath, s"!!! source row ($row) isn't contained in target result !!!")
+        for (ind <- source.indices) { // Перебираем строки в source и сравниваем с соответствующей строкой в target
+          if (source(ind) != target(ind)) { // (Работает только если массивы отсортированы)
+            logTest(sourcePath, s"!!! source row (${source(ind)}) isn't contained in target result !!!")
             return false
           }
         }
+//        for (row <- source) { // Проходим по строкам полученного результата и ищем их в target
+//          if (target.indexOf(row) == -1) { // Если какой-либо строки нет, то логгируем результат FAILED, указав строку, которой нет
+//            logTest(sourcePath, s"!!! source row ($row) isn't contained in target result !!!")
+//            return false
+//          }
+//        }
         logTest(sourcePath, res = true) // Если все строки содержатся в target, то логгируем SUCCESS-результат
         true
       } else { // Иначе логгируем FAILED-тест, указав причину о разности количества строк
