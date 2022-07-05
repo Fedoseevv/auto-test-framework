@@ -60,7 +60,7 @@ case class AutoTest(private val spark: SparkSession) {
     // Ниже создаем файловую систему из файла JAR(zip), а затем обходим каталоги и ищем по маске файлы тестов
     val src = getClass.getProtectionDomain.getCodeSource
     val jar = src.getLocation // Получаем путь до файла jar
-    val zip = new ZipInputStream(jar.openStream()) // создаем файловую систему из файла JAR(zip)
+    val zip = new ZipInputStream(jar.openStream()) // Создаем файловую систему из файла JAR(zip)
     val reg = new Regex("test_\\d+_source_\\w+.sql").regex // Регулярка для поиска файлов тестов
 
     while (true) { // Обход каталогов
@@ -87,7 +87,7 @@ case class AutoTest(private val spark: SparkSession) {
     }
   }
 
-  // Метод, используемый для вывода результата тестирования и "выброса" исключение, если какой-либо тест(-ы) не прошел
+  // Метод, используемый для вывода результата тестирования и "выброса" исключения, если какой-либо тест(-ы) не прошел
   def parseResult(): Unit = {
     var flag = false // false - ошибок нет, true - ошибка есть
     val failedTests: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty // Массив для сборы FAILED-тестов
@@ -112,7 +112,7 @@ case class AutoTest(private val spark: SparkSession) {
     //        failedTests.append(item._1)
     //      }
     //    }
-    if (flag)  // В случае обнаружение FAILED-теста "выбрасываем" исключение
+    if (flag)  // В случае обнаружения FAILED-теста "выбрасываем" исключение
       throw new Exception(s"Failed tests: ${failedTests.mkString(", ")} - *** FAILED ***")
     else
       println("All tests were successful! *** COMPLETED ***")

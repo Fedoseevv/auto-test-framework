@@ -114,9 +114,10 @@ left join Bank.Operations oper on
        acc.account_num = oper.account_num
 group by acc.id, acc.account_num, acc.client_type) t
 group by t.id, t.account_num, t.client_type
+order by t.id, t.account_num
 
 test_1_target_arrays.sql
-select * from Dm.dm_sum_operations
+select * from Dm.dm_sum_operations dm_sum order by dm_sum.id, dm_sum.account_num
 
 2.2) негативный
 test_2_source_arrays.sql
@@ -152,29 +153,30 @@ left join Bank.Operations oper on
        acc.account_num = oper.account_num
 group by acc.id, acc.account_num, acc.client_type) t
 group by t.id, t.account_num, t.client_type
+order by t.id, t.account_num
 
 test_2_target_arrays.sql
-select dm_sum.id, dm_sum.account_num, dm_sum.income, dm_sum.outcome from Dm.dm_sum_operations dm_sum
+select dm_sum.id, dm_sum.account_num, dm_sum.income, dm_sum.outcome from Dm.dm_sum_operations dm_sum order by dm_sum.id, dm_sum.account_num
 
 3)
 test_1_source_ddl.sql
-id,int,id клиента
-account_name,int,номер счета
-income,bigint,приход
-outcome,bigint,расход
-client_type,string,'Ф' - физическое или 'Ю' - юридическое лицо
+id;int
+account_num;int
+income;bigint
+outcome;bigint
+client_type;string
 
 test_1_target_ddl.sql
 describe Dm.dm_sum_operations
 
 4.1)
 test_1_source_constants.sql
-select dm_sum.id, dm_sum.account_num from Dm.dm_sum_operations dm_sum where dm_sum.client_type = 'Ф'
+select dm_sum.id, dm_sum.account_num from Dm.dm_sum_operations dm_sum where dm_sum.client_type = 'Ф' order by dm_sum.id, dm_sum.account_num 
 
 test_1_target_constants.sql
-1,1
-2,2
-3,3
+1;1
+2;2
+3;3
 
 4.2)
 test_2_source_constants.sql
