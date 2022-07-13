@@ -146,8 +146,12 @@ case class AutoTest(private val spark: SparkSession) {
       case ex: FileNotFoundException => // Если какой-то из файлов отсутствует в директории src/main/resources
         logTest(countSourcePath, "!!! Invalid file path !!!")
         false
-      case _: Throwable => // Если результат какого-либо запроса возвращает НЕ только количество строк (либо вовсе не количество строк)
-        logTest(countSourcePath, "!!! the schema of the result doesn't match the schema of the expected !!!")
+      case ex: AnalysisException => // Данный тип ошибки м.б при отсутствии какой-либо таблицы БД,
+        // либо при несовпадении схем двух df
+        logTest(countSourcePath, ex.message.split(";")(0))
+        false
+      case ex: Throwable =>  // Другие ошибки
+        logTest(countSourcePath, ex.getMessage)
         false
     }
   }
@@ -185,10 +189,14 @@ case class AutoTest(private val spark: SparkSession) {
       }
     } catch {
       case ex: FileNotFoundException => // Если какой-либо файл не удалось найти в папке ресурсов
-        logTest(sourceSQLPath, "!!! Invalid file path !!!")
+        logTest(sourceSQLPath, "!!! Target file for this test not found !!!")
         false
-      case _: Throwable => // Если схемы df не совпадают => результаты они вернули тоже разные => логгируем FAILED
-        logTest(sourceSQLPath, "!!! the schema of the result doesn't match the schema of the expected !!!")
+      case ex: AnalysisException => // Данный тип ошибки м.б при отсутствии какой-либо таблицы БД,
+        // либо при несовпадении схем двух df
+        logTest(sourceSQLPath, ex.message.split(";")(0))
+        false
+      case ex: Throwable =>  // Другие ошибки
+        logTest(sourceSQLPath, ex.getMessage)
         false
     }
   }
@@ -229,10 +237,14 @@ case class AutoTest(private val spark: SparkSession) {
       }
     } catch { // Сюда попадем, если схемы df не совпадают => результаты они вернули тоже разные => логгируем FAILED
       case ex: FileNotFoundException =>
-        logTest(sourceDDLPath, "!!! Invalid file path !!!")
+        logTest(sourceDDLPath, "!!! Target file for this test not found !!!")
         false
-      case _: Throwable => { // Если схемы df не совпадают => результаты они вернули тоже разные => логгируем FAILED
-        logTest(sourceDDLPath, "!!! source DDL doesn't match with target DDL !!!")
+      case ex: AnalysisException => // Данный тип ошибки м.б при отсутствии какой-либо таблицы БД,
+        // либо при несовпадении схем двух df
+        logTest(sourceDDLPath, ex.message.split(";")(0))
+        false
+      case ex: Throwable => { // Другие ошибки
+        logTest(sourceDDLPath, ex.getMessage)
         false
       }
     }
@@ -277,7 +289,7 @@ case class AutoTest(private val spark: SparkSession) {
       }
     } catch {
       case ex: FileNotFoundException => // Если путь до какого-либо файла указан некорректно
-        logTest(sourcePath, "!!! Invalid file path !!!")
+        logTest(sourcePath, "!!! Target file for this test not found !!!")
         false
       case _: Throwable =>
         logTest(sourcePath, "!!! Unexpected error. Check input files and try again !!!")
@@ -309,10 +321,15 @@ case class AutoTest(private val spark: SparkSession) {
       }
     } catch {
       case ex: FileNotFoundException => // Если какой-либо файл не удалось найти в папке ресурсов
-        logTest(sourcePath, "!!! Invalid file path !!!")
+        logTest(sourcePath, "!!! Target file for this test not found !!!")
         false
-      case _: Throwable => // Если схемы df не совпадают => результаты они вернули тоже разные => логгируем FAILED
-        logTest(sourcePath, "!!! the schema of the result doesn't match the schema of the expected !!!")
+
+      case ex: AnalysisException => // Данный тип ошибки м.б при отсутствии какой-либо таблицы БД,
+        // либо при несовпадении схем двух df
+        logTest(sourcePath, ex.message.split(";")(0))
+        false
+      case ex: Throwable =>  // Другие ошибки
+        logTest(sourcePath, ex.getMessage)
         false
 
     }
