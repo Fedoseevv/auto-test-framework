@@ -1,1 +1,1 @@
-select count(1) from sfedoseev_Dm.dm_sum_operations 
+select count(1) from dm_sum_operations

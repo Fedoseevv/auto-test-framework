@@ -143,12 +143,12 @@ case class AutoTest(private val spark: SparkSession) {
         true // Выходим из метода
       }
     } catch {
-      case ex: FileNotFoundException => // Если какой-то из файлов отсутствует в директории src/main/resources
-        logTest(countSourcePath, "!!! Invalid file path !!!")
-        false
       case ex: AnalysisException => // Данный тип ошибки м.б при отсутствии какой-либо таблицы БД,
         // либо при несовпадении схем двух df
-        logTest(countSourcePath, ex.message.split(";")(0))
+        logTest(countSourcePath, "!!! Source schema doesn't match target schema !!!")
+        false
+      case ex: NullPointerException => // Если какой-то из файлов отсутствует в директории src/main/resources
+        logTest(countSourcePath, "!!! Target file for this test not found !!!")
         false
       case ex: Throwable =>  // Другие ошибки
         logTest(countSourcePath, ex.getMessage)
@@ -174,7 +174,13 @@ case class AutoTest(private val spark: SparkSession) {
       val rowCountSource = sourceResult.count() // Количество строк source DF
       val rowCountTarget = targetResult.count() // Количество строк target DF
       val rowCountDiff: Long = Math.abs(rowCountSource - rowCountTarget) // Разница в количестве строк между DF
-
+//      println("total time for 2 count and 1 except:")
+//      spark.time(sourceResult.count())
+//      spark.time(targetResult.count())
+//      spark.time(targetResult.except(sourceResult).show())
+//      println("total time for 2 except:")
+//      spark.time(targetResult.except(sourceResult).show())
+//      spark.time(sourceResult.except(targetResult).show())
       if (rowCountDiff == 0) { // Если количество строк совпадает, то выполняем except и проверяем пустой результат или нет
         if (targetResult.except(sourceResult).count == 0) { // Если пустой, значит тест прошел
           logTest(sourceSQLPath, res = true)
@@ -188,12 +194,12 @@ case class AutoTest(private val spark: SparkSession) {
         false // Выходим из метода
       }
     } catch {
-      case ex: FileNotFoundException => // Если какой-либо файл не удалось найти в папке ресурсов
-        logTest(sourceSQLPath, "!!! Target file for this test not found !!!")
-        false
       case ex: AnalysisException => // Данный тип ошибки м.б при отсутствии какой-либо таблицы БД,
         // либо при несовпадении схем двух df
         logTest(sourceSQLPath, ex.message.split(";")(0))
+        false
+      case ex: NullPointerException => // Если какой-либо файл не удалось найти в папке ресурсов
+        logTest(sourceSQLPath, "!!! Target file for this test not found !!!")
         false
       case ex: Throwable =>  // Другие ошибки
         logTest(sourceSQLPath, ex.getMessage)
@@ -236,7 +242,7 @@ case class AutoTest(private val spark: SparkSession) {
         false
       }
     } catch { // Сюда попадем, если схемы df не совпадают => результаты они вернули тоже разные => логгируем FAILED
-      case ex: FileNotFoundException =>
+      case ex: NullPointerException =>
         logTest(sourceDDLPath, "!!! Target file for this test not found !!!")
         false
       case ex: AnalysisException => // Данный тип ошибки м.б при отсутствии какой-либо таблицы БД,
@@ -288,11 +294,11 @@ case class AutoTest(private val spark: SparkSession) {
         false
       }
     } catch {
-      case ex: FileNotFoundException => // Если путь до какого-либо файла указан некорректно
+      case ex: NullPointerException => // Если путь до какого-либо файла указан некорректно
         logTest(sourcePath, "!!! Target file for this test not found !!!")
         false
       case _: Throwable =>
-        logTest(sourcePath, "!!! Unexpected error. Check input files and try again !!!")
+        logTest(sourcePath, "!!! Error! Check input files and try again !!!")
         false
     }
   }
@@ -320,10 +326,9 @@ case class AutoTest(private val spark: SparkSession) {
         false // Выходим из метода
       }
     } catch {
-      case ex: FileNotFoundException => // Если какой-либо файл не удалось найти в папке ресурсов
+      case ex: NullPointerException => // Если какой-либо файл не удалось найти в папке ресурсов
         logTest(sourcePath, "!!! Target file for this test not found !!!")
         false
-
       case ex: AnalysisException => // Данный тип ошибки м.б при отсутствии какой-либо таблицы БД,
         // либо при несовпадении схем двух df
         logTest(sourcePath, ex.message.split(";")(0))

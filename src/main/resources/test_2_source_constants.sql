@@ -1,1 +1,1 @@
-select count(1) from sfedoseev_Dm.dm_sum_operations dm_sum where dm_sum.client_type = 'Л'
+select count(1) from dm_sum_operations dm_sum where dm_sum.client_type = 'Л'
