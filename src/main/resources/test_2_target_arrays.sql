@@ -1,1 +1,1 @@
-select dm_sum.id, dm_sum.account_num, dm_sum.income, dm_sum.outcome from dm_sum_operations dm_sum order by dm_sum.id, dm_sum.account_num
+select dm_sum.id, dm_sum.account_num, dm_sum.income, dm_sum.outcome from sfedoseev_Dm.dm_sum_operations dm_sum order by dm_sum.id, dm_sum.account_num

@@ -1,1 +1,1 @@
-select dm_sum.id, dm_sum.account_num from dm_sum_operations dm_sum where dm_sum.client_type = 'Ф' order by dm_sum.id, dm_sum.account_num
+select dm_sum.id, dm_sum.account_num from sfedoseev_Dm.dm_sum_operations dm_sum where dm_sum.client_type = 'Ф' order by dm_sum.id, dm_sum.account_num 

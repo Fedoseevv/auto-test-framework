@@ -2,8 +2,8 @@ name := "Auto-test framework"
 
 version := "0.1"
 
-scalaVersion := "2.12.15"
-//scalaVersion := "2.11.5"
+//scalaVersion := "2.12.15"
+scalaVersion := "2.11.5"
 
 val sparkVersion = "2.4.7"
 

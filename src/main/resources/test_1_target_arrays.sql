@@ -1,1 +1,1 @@
-select * from dm_sum_operations dm_sum order by dm_sum.id, dm_sum.account_num
+select * from sfedoseev_Dm.dm_sum_operations dm_sum order by dm_sum.id, dm_sum.account_num

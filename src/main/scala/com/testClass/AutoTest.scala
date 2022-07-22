@@ -26,14 +26,13 @@ case class AutoTest(private val spark: SparkSession) {
   private val results = mutable.Map.empty[String, Any]
   val logger = new CustomLogger // Логгер для логгирования результатов
 
-  private def getTestName(name: String): String = name.split("\\\\|//").last
+  private def getTestName(name: String): String = name.split("\\\\|//").last // Из пути к файлу "достаем" название и номер теста
     .replaceAll(new Regex("source_|target_|/").regex, "")
     .replaceAll(new Regex("\\.\\w+").regex, "")
 
   // Метод, используемый для записи в results данных о пройденных тестах
   private def logTest(name: String, res: Any): Any = {
-    // Из пути к файлу "достаем" название и номер теста
-    results += (getTestName(name) -> res) // Сохраяем результат очередного теста
+    results += (getTestName(name) -> res) // Сохраяем результат очередного теста (название -> либо true, либо причина провала теста)
   }
 
   // Метод, запускающий все тесты в локальном режиме (необходимо передать путь src/main/resources)
@@ -55,7 +54,8 @@ case class AutoTest(private val spark: SparkSession) {
     }
     this.parseResult() // После запуска всех тестов печатаем их результаты
   }
-  // Метод, для запуска тестирования в контуре
+
+  // Метод, для запуска тестирования в контуре (то есть когда запускаем jar-file)
   def startTestingOnCluster(): Unit = {
     // Ниже создаем файловую систему из файла JAR(zip), а затем обходим каталоги и ищем по маске файлы тестов
     val src = getClass.getProtectionDomain.getCodeSource
@@ -90,30 +90,22 @@ case class AutoTest(private val spark: SparkSession) {
   // Метод, используемый для вывода результата тестирования и "выброса" исключения, если какой-либо тест(-ы) не прошел
   def parseResult(): Unit = {
     var flag = false // false - ошибок нет, true - ошибка есть
-    val failedTests: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty // Массив для сборы FAILED-тестов
+    var exceptionMsg = "" // Сообщение, содержащее логи по всем тестам, а также список FAILED-тестов
+    val failedTests: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty // Массив для сбора FAILED-тестов
     logger.info("----- All tests result -----")
     results.foreach{ item => { // Идем по всем результатам и сопоставляем с образцом
       item match {
         case p if p._2.isInstanceOf[String] => // Если в поле _2 хранится строка, значит тест FAILED
           println(s"${item._1} *** 'FAILED' *** - Reason: ${item._2}")
+          exceptionMsg += s"${item._1} *** 'FAILED' *** - Reason: ${item._2}\n"
           flag = true // потому что найден FAILED-тест
           failedTests.append(item._1) // Добавляем название FAILED-теста
         case _ => println(s"${item._1} *** 'SUCCESS' ***") // В ином случае тест пройден успешно
+        exceptionMsg += s"${item._1} *** 'SUCCESS' ***\n"
       }
     } }
-    //    for (item <- results) {
-    //      if (item._2 == true) // Если результат теста положительный
-    //        logger.info(s"${item._1} - *** result: 'SUCCESS' ***")
-    //      else
-    //        logger.error(s"${item._1} - *** result: 'FAILED' ***")
-    //
-    //      if (item._2 == false) { // Если результат теста отрицательный, изменяем флаг
-    //        flag = true
-    //        failedTests.append(item._1)
-    //      }
-    //    }
     if (flag)  // В случае обнаружения FAILED-теста "выбрасываем" исключение
-      throw new Exception(s"Failed tests: ${failedTests.mkString(", ")} - *** FAILED ***")
+      throw new Exception(s"Failed tests: ${failedTests.mkString(", ")} - *** FAILED ***\n$exceptionMsg")
     else
       println("All tests were successful! *** COMPLETED ***")
   }
@@ -171,9 +163,9 @@ case class AutoTest(private val spark: SparkSession) {
       val targetResult: DataFrame = spark.sql(targetQuery) // Получаем второй датафрейм
       stream.close()
 
-      val rowCountSource = sourceResult.count() // Количество строк source DF
-      val rowCountTarget = targetResult.count() // Количество строк target DF
-      val rowCountDiff: Long = Math.abs(rowCountSource - rowCountTarget) // Разница в количестве строк между DF
+//      val rowCountSource = sourceResult.count() // Количество строк source DF
+//      val rowCountTarget = targetResult.count() // Количество строк target DF
+//      val rowCountDiff: Long = Math.abs(rowCountSource - rowCountTarget) // Разница в количестве строк между DF
 //      println("total time for 2 count and 1 except:")
 //      spark.time(sourceResult.count())
 //      spark.time(targetResult.count())
@@ -181,18 +173,18 @@ case class AutoTest(private val spark: SparkSession) {
 //      println("total time for 2 except:")
 //      spark.time(targetResult.except(sourceResult).show())
 //      spark.time(sourceResult.except(targetResult).show())
-      if (rowCountDiff == 0) { // Если количество строк совпадает, то выполняем except и проверяем пустой результат или нет
-        if (targetResult.except(sourceResult).count == 0) { // Если пустой, значит тест прошел
+//      if (rowCountDiff == 0) { // Если количество строк совпадает, то выполняем except и проверяем пустой результат или нет
+        if (targetResult.except(sourceResult).count == 0 && sourceResult.except(targetResult).count() == 0) { // Если пустой, значит тест прошел
           logTest(sourceSQLPath, res = true)
           true // Выходим из метода
         } else { // Если except вернул НЕ пустой df, то логгируем FAILED-тест и указываем причину
           logTest(sourceSQLPath, s"source dataframe doesn't match with target dataframe")
           false // Выходим из метода
         }
-      } else { // Если количество строк различается, except можно уже не делать, логгируем FAILED
-        logTest(sourceSQLPath, s"!!! source-count: $rowCountSource doesn't match target-count $rowCountTarget !!!")
-        false // Выходим из метода
-      }
+//      } else { // Если количество строк различается, except можно уже не делать, логгируем FAILED
+//        logTest(sourceSQLPath, s"!!! source-count: $rowCountSource doesn't match target-count $rowCountTarget !!!")
+//        false // Выходим из метода
+//      }
     } catch {
       case ex: AnalysisException => // Данный тип ошибки м.б при отсутствии какой-либо таблицы БД,
         // либо при несовпадении схем двух df
@@ -297,7 +289,7 @@ case class AutoTest(private val spark: SparkSession) {
       case ex: NullPointerException => // Если путь до какого-либо файла указан некорректно
         logTest(sourcePath, "!!! Target file for this test not found !!!")
         false
-      case _: Throwable =>
+      case ex: Throwable =>
         logTest(sourcePath, "!!! Error! Check input files and try again !!!")
         false
     }
@@ -318,7 +310,8 @@ case class AutoTest(private val spark: SparkSession) {
       stream.close()
 
       // Если количество строк в датафреймах одинаковое и except выдает пустой df, тогда они эквивалентны
-      if (sourceResult.count() == targetResult.count() && sourceResult.except(targetResult).count() == 0) {
+      sourceResult.count() == targetResult.count() && sourceResult.except(targetResult).count() == 0
+      if (sourceResult.except(targetResult).count() == 0 && targetResult.except(sourceResult).count() == 0) { // sourceResult.count() == targetResult.count() && sourceResult.except(targetResult).count() == 0
         logTest(sourcePath, res = true)
         true // Выходим из метода
       } else {
