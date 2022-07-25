@@ -25,7 +25,6 @@ case class AutoTest(private val spark: SparkSession) {
   // Содержит результаты пройденных тестов (название -> результат). Результатом может быть либо true, либо, в случае
   // FAILED-теста, причина, по которой тест не пройден
   private val results = mutable.Map.empty[String, Any]
-//  val logger = new CustomLogger // Логгер для логгирования результатов
 
   private def getTestName(name: String): String = name.split("\\\\|//").last // Из пути к файлу "достаем" название и номер теста
     .replaceAll(new Regex("source_|target_|/").regex, "")
@@ -41,7 +40,7 @@ case class AutoTest(private val spark: SparkSession) {
     println(logDT + " INFO: " + msg)
   }
 
-  // Метод, запускающий все тесты в локальном режиме (необходимо передать путь src/main/resources)
+  // Метод, запускающий все тесты в локальном режиме (необходимо передать путь до файлов (по умолчанию путь указан)
   def start(path: String = "src/main/resources"): Unit = {
     val filesHere = new File(path).listFiles() // Получаем все файлы в заданном каталоге
     // В зависимости от названия теста, запускаем определенный метод данного класса
@@ -169,28 +168,14 @@ case class AutoTest(private val spark: SparkSession) {
       val targetResult: DataFrame = spark.sql(targetQuery) // Получаем второй датафрейм
       stream.close()
 
-//      val rowCountSource = sourceResult.count() // Количество строк source DF
-//      val rowCountTarget = targetResult.count() // Количество строк target DF
-//      val rowCountDiff: Long = Math.abs(rowCountSource - rowCountTarget) // Разница в количестве строк между DF
-//      println("total time for 2 count and 1 except:")
-//      spark.time(sourceResult.count())
-//      spark.time(targetResult.count())
-//      spark.time(targetResult.except(sourceResult).show())
-//      println("total time for 2 except:")
-//      spark.time(targetResult.except(sourceResult).show())
-//      spark.time(sourceResult.except(targetResult).show())
-//      if (rowCountDiff == 0) { // Если количество строк совпадает, то выполняем except и проверяем пустой результат или нет
-        if (targetResult.except(sourceResult).count == 0 && sourceResult.except(targetResult).count == 0) { // Если пустой, значит тест прошел
-          appendTestRes(sourceSQLPath, res = true)
-          true // Выходим из метода
-        } else { // Если except вернул НЕ пустой df, то логгируем FAILED-тест и указываем причину
-          appendTestRes(sourceSQLPath, s"source dataframe doesn't match with target dataframe")
-          false // Выходим из метода
-        }
-//      } else { // Если количество строк различается, except можно уже не делать, логгируем FAILED
-//        appendTestRes(sourceSQLPath, s"!!! source-count: $rowCountSource doesn't match target-count $rowCountTarget !!!")
-//        false // Выходим из метода
-//      }
+      if (targetResult.except(sourceResult).count == 0 && sourceResult.except(targetResult).count == 0) { // Если пустой, значит тест прошел
+        appendTestRes(sourceSQLPath, res = true)
+        true // Выходим из метода
+      } else { // Если except вернул НЕ пустой df, то логгируем FAILED-тест и указываем причину
+        appendTestRes(sourceSQLPath, s"source dataframe doesn't match with target dataframe")
+        false // Выходим из метода
+      }
+
     } catch {
       case ex: AnalysisException => // Данный тип ошибки м.б при отсутствии какой-либо таблицы БД,
         // либо при несовпадении схем двух df
@@ -205,7 +190,7 @@ case class AutoTest(private val spark: SparkSession) {
     }
   }
 
-  // Метод для чтения DDL таблицы в формате csv из файла в папке resources
+  // Метод для чтения DDL таблицы в формате csv из файла в папке resources, возвращает dataframe, содержащий название поля и тип
   private def readDdlFromResource(path: String, del: String = ";"): DataFrame = {
     val stream = getClass.getResourceAsStream(path)
     val file = Source.fromInputStream(stream).getLines().toSeq // Считываем все строки
@@ -218,12 +203,12 @@ case class AutoTest(private val spark: SparkSession) {
     spark.createDataFrame(records) // Возвращаем датафрейм, содержащий DDL таблицы
   }
 
-  // Метод, реализующий сравнение двух DDL, на вход sql-запрос (describe Table) и .sql-файл, содержащий DDL-таблицы в формате csv
+  // Метод, реализующий сравнение двух DDL, на вход sql-запрос (describe Table) и *.sql-файл, содержащий DDL-таблицы в формате csv
   def isEqualSchemas(sourceDDLPath: String, targetDDLPath: String): Boolean = {
     try {
       logInfo(s"${getTestName(sourceDDLPath)} started...")
-      // Считываем датафрейм и удаляем столбец с комментариями
-      val sourceDDL: DataFrame = readDdlFromResource(sourceDDLPath) //.drop("comment")
+      // Считываем датафрейм
+      val sourceDDL: DataFrame = readDdlFromResource(sourceDDLPath)
 
       // Считываем датафрейм и удаляем столбец с комментариями
       val stream = getClass.getResourceAsStream(targetDDLPath)
@@ -254,7 +239,7 @@ case class AutoTest(private val spark: SparkSession) {
     }
   }
 
-  // Метод, реализующий сравнение результата sql-запроса с заданным файлом .sql, содержащим ожидаемый результат в формате csv
+  // Метод, реализующий сравнение результата sql-запроса с заданным файлом *.sql, содержащим ожидаемый результат в формате csv
   def isEqualConstants(sourcePath: String, targetPath: String): Boolean = {
     try {
       logInfo(s"${getTestName(sourcePath)} started...")
@@ -303,6 +288,7 @@ case class AutoTest(private val spark: SparkSession) {
     }
   }
 
+  // Дополнительный метод, сравнивающий два датафрейма
   def isEqualDataframes(sourcePath: String, targetPath: String): Boolean = {
     logInfo(s"${getTestName(sourcePath)} started...")
     try {
@@ -317,8 +303,7 @@ case class AutoTest(private val spark: SparkSession) {
       val targetResult: DataFrame = spark.sql(targetQuery) // Получаем второй датафрейм
       stream.close()
 
-      // Если количество строк в датафреймах одинаковое и except выдает пустой df, тогда они эквивалентны
-//      sourceResult.count() == targetResult.count() && sourceResult.except(targetResult).count() == 0
+      // Если два except выдает пустые df, тогда они эквивалентны
       if (sourceResult.except(targetResult).count() == 0 && targetResult.except(sourceResult).count() == 0) { // sourceResult.count() == targetResult.count() && sourceResult.except(targetResult).count() == 0
         appendTestRes(sourcePath, res = true)
         true // Выходим из метода
@@ -337,7 +322,6 @@ case class AutoTest(private val spark: SparkSession) {
       case ex: Throwable =>  // Другие ошибки
         appendTestRes(sourcePath, ex.getMessage)
         false
-
     }
   }
 }
