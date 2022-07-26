@@ -234,6 +234,7 @@ case class AutoTest(private val spark: SparkSession) {
         false
       case ex: MatchError => // Данный вид ошибки получаем, если source файл содержит более двух столбцов
         appendTestRes(sourceDDLPath, "!!! Check source file. This file should contain only the attribute name and data type !!!")
+        false
       case ex: Throwable => { // Другие ошибки
         appendTestRes(sourceDDLPath, ex.getMessage)
         false
