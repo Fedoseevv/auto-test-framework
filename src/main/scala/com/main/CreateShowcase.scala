@@ -3,6 +3,8 @@ package com.main
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructType}
 
+// В данном файле создается большая витрина данных и записывается в csv
+
 object CreateShowcase {
   def main(args: Array[String]): Unit = {
     System.setProperty("hadoop.home.dir", "D:\\opt\\spark-2.4.7-bin-hadoop2.7")

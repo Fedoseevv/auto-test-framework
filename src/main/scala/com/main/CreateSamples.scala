@@ -4,6 +4,8 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
+// В данном файле создаются большие сэмплы для тестирования
+
 object CreateSamples {
   case class Users(user_id: String, last_nm: String, first_nm: String, middle_nm: String, birth_dt: String)
   case class Accounts(account_num: String, account_balance: String, open_dt: String, id: String, client_type: String)
