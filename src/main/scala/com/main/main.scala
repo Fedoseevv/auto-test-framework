@@ -17,7 +17,6 @@ object main {
       .config("spark.executor.instances", "2")
       .config("spark.executor.cores", "2")
       .config("spark.submit.deployMode", "cluster")
-      .config("spark.sql.shuffle.partitions", "20")
       .getOrCreate()
     spark.sparkContext.setLogLevel("ERROR")
 

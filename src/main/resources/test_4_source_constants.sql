@@ -1,1 +1,0 @@
-select * from dm_sum_operations
